@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import { StatCardSkeleton, TableSkeleton } from '../components/LoadingSkeleton';
 import { Toast } from '../components/Toast';
-import { FileText, FileZip, CheckCircle2, AlertCircle, Clock, UploadCloud } from 'lucide-react';
+import { FileText, CheckCircle2, AlertCircle, Clock, UploadCloud } from 'lucide-react';
 
 interface Assignment {
   id: string;

@@ -17,7 +17,7 @@ export const ChatPage: React.FC = () => {
   
   // Typing indicators
   const [typingStatus, setTypingStatus] = useState<{ name: string; isTyping: boolean } | null>(null);
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const typingTimeoutRef = useRef<any>(null);
 
   const [loadingRooms, setLoadingRooms] = useState(true);
   const [toastMessage, setToastMessage] = useState('');
