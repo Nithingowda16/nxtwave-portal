@@ -2,7 +2,6 @@ databases:
   # 1. Managed PostgreSQL Database
   - name: nxtwave-postgres
     databaseName: nxtwave_lms
-    user: postgres
     plan: free
 
 services:
