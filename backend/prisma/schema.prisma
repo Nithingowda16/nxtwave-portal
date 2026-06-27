@@ -1,0 +1,369 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  MENTOR
+  STUDENT
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+}
+
+enum EmiStatus {
+  PAID
+  PENDING
+  OVERDUE
+}
+
+enum PaymentMethod {
+  RAZORPAY
+  UPI
+  CASH
+  BANK_TRANSFER
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+}
+
+model User {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  passwordHash String
+  role         Role
+  studentId    String?    @unique // e.g. NW-STUD-1001
+  employeeId   String?    @unique // e.g. NW-EMP-5001
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  
+  profile      Profile?
+  student      Student?
+  mentor       Mentor?
+  auditLogs    AuditLog[]
+  sentMessages Message[]  @relation("SentMessages")
+}
+
+model Profile {
+  id               String    @id @default(uuid())
+  userId           String    @unique
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name             String
+  fatherName       String?
+  motherName       String?
+  mobile           String
+  address          String?
+  aadhaar          String?
+  college          String?
+  branch           String?
+  semester         String?
+  admissionDate    DateTime  @default(now())
+  bloodGroup       String?
+  emergencyContact String?
+  profilePhoto     String?   // S3 URL or Base64 placeholder
+  updatedAt        DateTime  @updatedAt
+}
+
+model Course {
+  id          String         @id @default(uuid())
+  title       String
+  description String?
+  createdAt   DateTime       @default(now())
+  
+  batches     Batch[]
+  modules     Module[]
+  quizzes     Quiz[]
+  mentors     Mentor[]       @relation("MentorCourses")
+  students    Student[]
+}
+
+model Module {
+  id        String    @id @default(uuid())
+  courseId  String
+  course    Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title     String
+  order     Int
+  
+  chapters  Chapter[]
+}
+
+model Chapter {
+  id              String         @id @default(uuid())
+  moduleId        String
+  module          Module         @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  title           String
+  order           Int
+  
+  videos          Video[]
+  resources       Resource[]
+  recordedClasses RecordedClass[]
+  assignments     Assignment[]
+}
+
+model Video {
+  id        String  @id @default(uuid())
+  chapterId String
+  chapter   Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  title     String
+  url       String
+  order     Int
+}
+
+model Resource {
+  id        String  @id @default(uuid())
+  chapterId String
+  chapter   Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  title     String
+  url       String  // PDF or PPT download link
+  type      String  // PDF, PPT, ZIP
+}
+
+model Batch {
+  id         String      @id @default(uuid())
+  name       String      @unique // e.g. Batch-2026-A
+  courseId   String
+  course     Course      @relation(fields: [courseId], references: [id])
+  mentorId   String?
+  mentor     Mentor?     @relation(fields: [mentorId], references: [id])
+  
+  students   Student[]
+  timetables Timetable[]
+}
+
+model Student {
+  id                  String                 @id @default(uuid())
+  userId              String                 @unique
+  user                User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId            String
+  course              Course                 @relation(fields: [courseId], references: [id])
+  batchId             String
+  batch               Batch                  @relation(fields: [batchId], references: [id])
+  mentorId            String?
+  mentor              Mentor?                @relation(fields: [mentorId], references: [id])
+  
+  totalFee            Float
+  scholarship         Float                  @default(0)
+  discount            Float                  @default(0)
+  remainingBalance    Float
+  
+  attendances         Attendance[]
+  submissions         AssignmentSubmission[]
+  emis                EMI[]
+  quizResults         QuizResult[]
+  certificates        Certificate[]
+  supportTickets      SupportTicket[]
+  chats               Chat[]                 @relation("StudentChats")
+}
+
+model Mentor {
+  id           String       @id @default(uuid())
+  userId       String       @unique
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  students     Student[]
+  batches      Batch[]
+  courses      Course[]     @relation("MentorCourses")
+  chats        Chat[]       @relation("MentorChats")
+  gradedSubs   AssignmentSubmission[] @relation("GradedByMentor")
+}
+
+model Attendance {
+  id        String           @id @default(uuid())
+  studentId String
+  student   Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  date      DateTime
+  status    AttendanceStatus
+  subject   String
+  markedBy  String           // User ID who marked
+  createdAt DateTime         @default(now())
+}
+
+model Assignment {
+  id          String                 @id @default(uuid())
+  chapterId   String
+  chapter     Chapter                @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  fileUrl     String?                // PDF / ZIP resource
+  maxMarks    Float
+  deadline    DateTime
+  createdAt   DateTime               @default(now())
+  
+  submissions AssignmentSubmission[]
+}
+
+model AssignmentSubmission {
+  id           String     @id @default(uuid())
+  assignmentId String
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  studentId    String
+  student      Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  
+  fileUrl      String     // Student submitted file
+  submitTime   DateTime   @default(now())
+  marks        Float?
+  feedback     String?
+  gradedBy     String?    // Mentor ID
+  gradedAt     DateTime?
+  mentor       Mentor?    @relation("GradedByMentor", fields: [gradedBy], references: [id])
+}
+
+model EMI {
+  id            String    @id @default(uuid())
+  studentId     String
+  student       Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  emiNumber     Int
+  dueDate       DateTime
+  amount        Float
+  paymentDate   DateTime?
+  paymentMethod String?
+  status        EmiStatus @default(PENDING)
+  receiptUrl    String?
+  lateFee       Float     @default(0)
+  refunded      Boolean   @default(false)
+  
+  payments      Payment[]
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  emiId         String
+  emi           EMI           @relation(fields: [emiId], references: [id], onDelete: Cascade)
+  transactionId String        @unique // Razorpay ID or Manual transaction reference
+  amount        Float
+  paymentDate   DateTime      @default(now())
+  paymentMethod PaymentMethod
+  status        String        @default("SUCCESS") // SUCCESS, FAILED
+}
+
+model Chat {
+  id        String    @id @default(uuid())
+  studentId String?
+  student   Student?  @relation("StudentChats", fields: [studentId], references: [id], onDelete: Cascade)
+  mentorId  String?
+  mentor    Mentor?   @relation("MentorChats", fields: [mentorId], references: [id], onDelete: Cascade)
+  isAdmin   Boolean   @default(false) // If true, chat is student-admin or mentor-admin
+  createdAt DateTime  @default(now())
+  
+  messages  Message[]
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  chatId     String
+  chat       Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  senderId   String
+  sender     User     @relation("SentMessages", fields: [senderId], references: [id])
+  content    String
+  attachment String?  // Optional Attachment URL (PDF, Voice note, ZIP, Image)
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model Quiz {
+  id           String       @id @default(uuid())
+  courseId     String
+  course       Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title        String
+  durationMin  Int          @default(30)
+  maxMarks     Float
+  negativeMark Float        @default(0)
+  createdAt    DateTime     @default(now())
+  
+  questions    Question[]
+  results      QuizResult[]
+}
+
+model Question {
+  id          String   @id @default(uuid())
+  quizId      String
+  quiz        Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  content     String   // The question text
+  options     String[] // MCQ options array
+  correctIndex Int     // Correct option index
+}
+
+model QuizResult {
+  id        String   @id @default(uuid())
+  quizId    String
+  quiz      Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  studentId String
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  score     Float
+  timeTaken Int      // Seconds
+  completed DateTime @default(now())
+}
+
+model Certificate {
+  id             String   @id @default(uuid())
+  studentId      String
+  student        Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  courseName     String
+  certificateId  String   @unique // e.g. CERT-NW-2026-X
+  completionDate DateTime @default(now())
+  verificationUrl String
+  qrCodeUrl      String?
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  action      String   // e.g. LOGIN, ATTENDANCE_UPDATE, ASSIGNMENT_SUBMISSION
+  description String
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+}
+
+model Timetable {
+  id        String   @id @default(uuid())
+  batchId   String
+  batch     Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  subject   String
+  startTime DateTime
+  endTime   DateTime
+  liveUrl   String?
+  mentorName String
+}
+
+model RecordedClass {
+  id         String   @id @default(uuid())
+  chapterId  String
+  chapter    Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  title      String
+  videoUrl   String
+  notesUrl   String?
+  createdAt  DateTime @default(now())
+}
+
+model SupportTicket {
+  id        String       @id @default(uuid())
+  studentId String
+  student   Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject   String
+  message   String
+  status    TicketStatus @default(OPEN)
+  createdAt DateTime     @default(now())
+}
+
+model Announcement {
+  id        String   @id @default(uuid())
+  title     String
+  content   String
+  targetRole String   @default("ALL") // ALL, STUDENT, MENTOR
+  createdAt DateTime @default(now())
+}
