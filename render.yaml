@@ -31,9 +31,8 @@ services:
         value: "*" # Allow sockets/CORS requests from any client URL initially
 
   # 3. Vite React Frontend Static Site
-  - type: web
+  - type: static
     name: nxtwave-frontend
-    env: static
     plan: free
     rootDir: frontend
     buildCommand: npm install && npm run build
