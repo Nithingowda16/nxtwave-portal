@@ -37,9 +37,10 @@ services:
     plan: free
     rootDir: frontend
     buildCommand: npm install && npm run build
-    publishDir: dist
+    publishPath: dist
     headers:
-      - key: Cache-Control
+      - path: /*
+        name: Cache-Control
         value: no-cache
     routes:
       # Redirect all routes to index.html for React Router SPA support
