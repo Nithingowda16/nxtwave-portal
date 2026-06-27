@@ -1,11 +1,11 @@
-services:
+databases:
   # 1. Managed PostgreSQL Database
-  - type: db
-    name: nxtwave-postgres
+  - name: nxtwave-postgres
     databaseName: nxtwave_lms
     user: postgres
     plan: free
 
+services:
   # 2. Node.js Backend Web Service
   - type: web
     name: nxtwave-backend
@@ -13,7 +13,7 @@ services:
     plan: free
     rootDir: backend
     buildCommand: npm install && npx prisma generate && npm run build
-    startCommand: npx prisma db push && node dist/index.js
+    startCommand: npx prisma db push && node dist/prisma/seed.js && node dist/index.js
     envVars:
       - key: DATABASE_URL
         fromDatabase:
